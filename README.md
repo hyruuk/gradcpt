@@ -19,27 +19,29 @@ cd /path/to/gradcpt
 uv venv --python 3.10
 uv pip install -e ".[dev]"
 
-# activate (or use .venv/bin/pytest directly)
-source .venv/bin/activate
-
 # run the test suite (no display required)
-pytest
+uv run pytest
 ```
 
-To actually run the experiment you also need PsychoPy and its system deps. On
-Linux this can be finicky; see [docs/quickstart.md](docs/quickstart.md):
+To actually run the experiment you also need PsychoPy. PsychoPy lives in a
+PEP 735 dependency group (not in `[project.optional-dependencies]`) because
+its 2024.2.x releases pull in an unpublished `pypi-search` transitive that
+breaks lockfile resolution. Install with:
 
 ```bash
-uv pip install -e ".[dev,run]"
+uv pip install --group run -e .
 uv run gradcpt run --subject pilot01 --bids-root ./bids
 ```
+
+On Linux PsychoPy can still be finicky — see [docs/quickstart.md](docs/quickstart.md)
+for fallbacks (Standalone PsychoPy, `--no-deps`, etc.).
 
 Optional hardware-trigger backends:
 
 ```bash
-uv pip install -e ".[run,lsl]"           # add LSL marker stream
-uv pip install -e ".[run,serial]"        # add serial-port triggers
-uv pip install -e ".[run,all-triggers]"  # all of the above
+uv pip install -e ".[lsl]"           # add LSL marker stream
+uv pip install -e ".[serial]"        # add serial-port triggers
+uv pip install -e ".[all-triggers]"  # both
 ```
 
 ## CLI

@@ -26,11 +26,9 @@ dependencies = [
     "Pillow>=10",
 ]
 
-# PsychoPy is an optional install — the package is importable, testable,
-# and the post-hoc reconciliation runs without it. Install [run] to actually
-# present the task on a screen.
+# Optional install extras for hardware-trigger backends. These resolve
+# cleanly on PyPI and can safely live in the universal lockfile.
 [project.optional-dependencies]
-run = ["psychopy>=2024.2,<2025"]
 serial = ["pyserial>=3.5"]
 lsl = ["pylsl>=1.16"]
 parallel = []
@@ -43,8 +41,28 @@ dev = [
     "mypy>=1.10",
 ]
 
+# PEP 735 dependency groups. PsychoPy lives here (not in
+# `optional-dependencies`) because PsychoPy 2024.2.x's transitive deps
+# (notably `pypi-search`) are not always satisfiable on PyPI, and a
+# universal lockfile that includes them aborts every `uv run` even when the
+# user only needs base / dev deps. Groups are opt-in: install with
+# `uv pip install -e . --group run` or `uv sync --group run`.
+[dependency-groups]
+run = ["psychopy>=2024.2,<2025"]
+
 [project.scripts]
 gradcpt = "gradcpt.cli:main"
+
+[tool.uv]
+# PsychoPy 2024.2.x transitively depends on `pypi-search`, which is not
+# published to PyPI under that name — every version of PsychoPy in our
+# range fails resolution by default. Override the dep with a never-matching
+# marker so uv's universal lockfile skips it. Users who actually rely on
+# PsychoPy's `pypi_search` import (an internal helper for browsing PyPI from
+# the IDE) won't need it for running experiments.
+override-dependencies = [
+    "pypi-search; python_version < '0'",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gradcpt"]

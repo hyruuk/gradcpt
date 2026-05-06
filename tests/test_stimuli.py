@@ -64,7 +64,8 @@ def test_apply_circular_mask_zero_fill_for_floats():
     img = np.full((8, 8), 0.7, dtype=np.float32)
     masked = apply_circular_mask(img)
     assert masked[0, 0] == 0.0
-    assert masked[4, 4] == 0.7
+    # 0.7 is not exactly representable in float32, so compare with tolerance.
+    np.testing.assert_allclose(masked[4, 4], 0.7, rtol=1e-6)
 
 
 def test_preprocess_image_full_pipeline():
