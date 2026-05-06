@@ -80,6 +80,11 @@ class StimuliConfig:
     apply_circular_mask: bool = True
     flip_vertical: bool = True
     normalize_to_minus1_plus1: bool = True
+    # Drawn size in PsychoPy "height" units (1.0 = full screen height,
+    # both axes). At 0.5 the stimulus is half the screen height tall and
+    # the same in width — a square (and circular after masking) regardless
+    # of the screen's aspect ratio.
+    display_size: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -150,6 +155,8 @@ class Config:
         s = self.stimuli
         if s.image_size_px < 8:
             raise ConfigError("stimuli.image_size_px must be >= 8")
+        if not 0 < s.display_size <= 2:
+            raise ConfigError("stimuli.display_size must be in (0, 2]")
 
         w = self.window
         if w.size[0] <= 0 or w.size[1] <= 0:

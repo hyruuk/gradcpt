@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Sequence
 import numpy as np
 
 from ..codebook import EventCode
+from ..errors import ExperimentInterrupted
 from ..responses import KeyPressLog, KeyPressRecord, provisional_assign
 from ..sequencing import TrialPlan
 from ..transitions import TransitionBuffer
@@ -78,11 +79,19 @@ def run_trial_loop(
     buf = TransitionBuffer(steps=transition_steps, h=h, w=w)
     gray = np.zeros((h, w), dtype=np.float32)
 
-    # Prime: gray → image[0]
+    # Fill: gray → image[0]
     arr0 = image_array_by_id[plan[0].image_id]
-    buf.prime(gray, arr0)
+    buf.fill(gray, arr0)
     n_trials = len(plan)
     onsets: list[TrialOnset] = []
+
+    # Always include "escape" in the polled key list so the participant /
+    # experimenter can abort. We separate the escape-key check from the
+    # response-key logging so escape never lands in the keypress log.
+    polled_keys = [dom_key, "escape"]
+    if log_extra_keys and nondom_key not in polled_keys:
+        polled_keys.append(nondom_key)
+    response_keys = {dom_key} | ({nondom_key} if log_extra_keys else set())
 
     for trial_pos in range(n_trials):
         plan_t = plan[trial_pos]
@@ -102,43 +111,37 @@ def run_trial_loop(
 
         onset_t: float | None = None
         for frame_idx in range(transition_steps):
-            image_stim.image = buf.frame(frame_idx)
+            image_stim.setImage(buf.frame(frame_idx), log=False)
             image_stim.draw()
             flip_t = win.flip()
             if frame_idx == 0:
                 onset_t = flip_t
 
-            # Poll keyboard
-            keys = kb.getKeys(
-                keyList=[dom_key, nondom_key] if log_extra_keys else [dom_key],
-                waitRelease=False,
-                clear=False,
-            )
+            keys = kb.getKeys(keyList=polled_keys, waitRelease=False, clear=False)
             for k in keys:
-                _log_keypress(
-                    kp_log=keypress_log,
-                    key_event=k,
-                    block_idx=block_idx,
-                    trial_idx=trial_idx,
-                    plan_t=plan_t,
-                    frame_idx=frame_idx,
-                    transition_steps=transition_steps,
-                    onset_t=onset_t,
-                    flip_t=flip_t,
-                    dom_key=dom_key,
-                    unambig_low=unambig_low,
-                    unambig_high=unambig_high,
-                    sender=sender,
-                    win=win,
-                )
+                if k.name == "escape":
+                    raise ExperimentInterrupted("escape pressed during trial loop")
+                if k.name in response_keys:
+                    _log_keypress(
+                        kp_log=keypress_log,
+                        key_event=k,
+                        block_idx=block_idx,
+                        trial_idx=trial_idx,
+                        plan_t=plan_t,
+                        frame_idx=frame_idx,
+                        transition_steps=transition_steps,
+                        onset_t=onset_t,
+                        flip_t=flip_t,
+                        dom_key=dom_key,
+                        unambig_low=unambig_low,
+                        unambig_high=unambig_high,
+                        sender=sender,
+                        win=win,
+                    )
             kb.clearEvents()
 
-            # Generate the NEXT trial's transition during *this* trial's playback
-            if frame_idx == 1 and trial_pos + 1 < n_trials:
-                next_arr = image_array_by_id[plan[trial_pos + 1].image_id]
-                buf.advance(next_arr)
-
-        # Tally drops for this trial
+        # Tally drops for this trial (after the frame loop, while the screen
+        # holds the just-finished trial's last frame)
         n_dropped = int(np.sum(np.asarray(win.frameIntervals) > refresh_threshold_s))
         onsets.append(
             TrialOnset(
@@ -151,11 +154,16 @@ def run_trial_loop(
             )
         )
 
-        # If a probe is due, run it then re-prime gray → next trial's image
+        # Prepare the next trial's transition.
+        # If a probe is due, run it first; the probe leaves the screen blank
+        # and we resume from gray → next image (matching original gradcptpy).
         if is_probe_due(trial_idx):
             on_probe_due(trial_idx)
             if trial_pos + 1 < n_trials:
-                buf.prime(gray, image_array_by_id[plan[trial_pos + 1].image_id])
+                buf.fill(gray, image_array_by_id[plan[trial_pos + 1].image_id])
+        elif trial_pos + 1 < n_trials:
+            # Continuous transition: linspace(current_image, next_image)
+            buf.step_to(image_array_by_id[plan[trial_pos + 1].image_id])
 
     return onsets
 

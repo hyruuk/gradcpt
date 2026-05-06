@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ..codebook import EventCode
 from ..config import ProbeConfig
+from ..errors import ExperimentInterrupted
 from ..probes import ProbeItem, order_items_for_probe
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -89,6 +90,9 @@ def _run_probe_item(
         text.draw()
         low.draw()
         high.draw()
+        # Always poll for escape so the participant can abort during a probe.
+        if kb.getKeys(keyList=["escape"], waitRelease=False, clear=False):
+            raise ExperimentInterrupted("escape pressed during probe")
         if slider.rating is not None:
             enter_prompt.draw()
             if slider_response_t is None:

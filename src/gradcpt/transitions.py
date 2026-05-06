@@ -1,14 +1,18 @@
-"""Double-buffered transition generator.
+"""Transition generator.
 
-The trial loop walks ``transition_steps`` frames per trial, each frame a
-linear interpolation between the previous and current images. Generating a
-fresh interpolation array (~12 MB at default settings) inside the
-timing-critical part of the trial loop is what causes the original
-implementation's "extra frame somewhere" jitter; we avoid that by
-maintaining two pre-allocated buffers and computing the *next* trial's
-transition during the *current* trial's playback frames.
+Each trial of GradCPT walks ``transition_steps`` frames of a per-pixel
+linear interpolation from the previous image to the current image.
 
-Memory at default (256×256, 48 steps, float32): 2 × 12 MB ≈ 24 MB. Cheap.
+This module owns one pre-allocated ``(steps, H, W)`` float32 buffer that's
+overwritten in-place at each trial boundary. Earlier double-buffered designs
+are tempting (overlap the next-trial compute with the current trial's
+playback) but the buffer-swap semantics are easy to get wrong — see the
+"flicker on frames 1+ of each trial" regression that we hit on the first
+try. The vectorized fill below runs in a few milliseconds even at
+default settings, well under one frame interval at 60–144 Hz, so a single
+buffer with a fill at each trial boundary is plenty.
+
+Memory at default (256×256, 48 steps, float32): ``48 × 256 × 256 × 4 B ≈ 12 MB``.
 """
 from __future__ import annotations
 
@@ -16,18 +20,19 @@ import numpy as np
 
 
 class TransitionBuffer:
-    """Two pre-allocated float32 buffers of shape (steps, H, W).
+    """Single pre-allocated float32 buffer of shape ``(steps, H, W)``.
 
     Usage::
 
         buf = TransitionBuffer(steps=48, h=256, w=256)
-        buf.prime(image_a, image_b)            # buf.current = linspace(a, b)
-        for f in range(steps):
-            display(buf.frame(f))
-        buf.advance(image_c)                   # current ← next; next ← linspace(b, c)
+        buf.fill(image_a, image_b)            # buf[k] = a + (b-a) * (k/steps)
+        for k in range(steps):
+            display(buf.frame(k))
+        buf.step_to(image_c)                  # buf = linspace(b, c)
 
-    The ``advance`` call *swaps* the role of the two buffers and writes the
-    new linspace into what becomes ``next``. No allocations after construction.
+    ``fill`` and ``step_to`` overwrite the buffer in place — no allocation
+    after construction. The compute is fully vectorized (~5 ms at default
+    settings), so calling ``step_to`` between trials does not drop frames.
     """
 
     def __init__(self, steps: int, h: int, w: int, dtype: np.dtype = np.float32):
@@ -37,66 +42,43 @@ class TransitionBuffer:
         self.h = h
         self.w = w
         self.dtype = np.dtype(dtype)
-        self._buf_a = np.empty((steps, h, w), dtype=self.dtype)
-        self._buf_b = np.empty((steps, h, w), dtype=self.dtype)
-        self._current = self._buf_a
-        self._next = self._buf_b
-        self._endpoint_current: np.ndarray | None = None  # last frame of current
+        self._buf = np.empty((steps, h, w), dtype=self.dtype)
+        # Per-step weights k/steps for k in [0, steps). Cached.
+        self._weights = (np.arange(steps, dtype=self.dtype) / steps)[:, None, None]
+        self._endpoint: np.ndarray | None = None
         self._primed = False
 
     @property
     def current(self) -> np.ndarray:
-        return self._current
+        """The active ``(steps, H, W)`` buffer (alias used by tests)."""
+        return self._buf
 
-    @property
-    def next(self) -> np.ndarray:
-        return self._next
-
-    def prime(self, image_a: np.ndarray, image_b: np.ndarray) -> None:
-        """Initialize ``current`` with linspace(a → b). Must be called first."""
+    def fill(self, image_a: np.ndarray, image_b: np.ndarray) -> None:
+        """Overwrite the buffer with ``linspace(a, b, steps, endpoint=False)``."""
         self._validate_image(image_a)
         self._validate_image(image_b)
-        self._fill_linspace_into(self._current, image_a, image_b)
-        self._endpoint_current = np.asarray(image_b, dtype=self.dtype)
+        a = np.asarray(image_a, dtype=self.dtype)
+        b = np.asarray(image_b, dtype=self.dtype)
+        # buf[k] = a + (b - a) * (k / steps), vectorized in two ops.
+        delta = (b - a)
+        np.multiply(self._weights, delta, out=self._buf)
+        self._buf += a  # broadcast (1, H, W) over (steps, H, W) — in-place add
+        self._endpoint = b
         self._primed = True
 
-    def advance(self, image_next: np.ndarray) -> None:
-        """Swap buffers; write linspace(prev_end → image_next) into the new ``next``.
+    def step_to(self, image_next: np.ndarray) -> None:
+        """Convenience: ``fill(previous_endpoint, image_next)``.
 
-        After this call, ``current`` is the just-played transition's *successor*
-        (i.e. the buffer previously known as ``next``), and ``next`` holds the
-        transition from the new endpoint to ``image_next``.
+        Used at trial boundaries to advance to the next image.
         """
-        if not self._primed:
-            raise RuntimeError("prime() must be called before advance()")
-        self._validate_image(image_next)
-        # Swap roles
-        self._current, self._next = self._next, self._current
-        # Compute new transition into the now-spare buffer
-        self._fill_linspace_into(self._next, self._endpoint_current, image_next)
-        self._endpoint_current = np.asarray(image_next, dtype=self.dtype)
-
-    def _fill_linspace_into(
-        self, buf: np.ndarray, a: np.ndarray, b: np.ndarray
-    ) -> None:
-        """Compute linspace(a, b, steps, endpoint=False) directly into ``buf``.
-
-        Avoids re-allocating the full (steps, H, W) array each call. The
-        intermediate ``delta`` is a (H, W) block — small.
-        """
-        a = np.asarray(a, dtype=self.dtype)
-        b = np.asarray(b, dtype=self.dtype)
-        delta = (b - a)
-        steps = self.steps
-        # frame_k = a + delta * (k / steps)
-        for k in range(steps):
-            np.multiply(delta, k / steps, out=buf[k])
-            np.add(buf[k], a, out=buf[k])
+        if not self._primed or self._endpoint is None:
+            raise RuntimeError("fill() must be called before step_to()")
+        self.fill(self._endpoint, image_next)
 
     def frame(self, idx: int) -> np.ndarray:
         if not 0 <= idx < self.steps:
             raise IndexError(f"frame idx {idx} out of [0, {self.steps})")
-        return self._current[idx]
+        return self._buf[idx]
 
     def _validate_image(self, img: np.ndarray) -> None:
         if img.shape != (self.h, self.w):

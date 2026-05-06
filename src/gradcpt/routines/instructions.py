@@ -17,17 +17,23 @@ def show_text_then_wait(
 ) -> float:
     """Display ``text`` and block until any of ``advance_keys`` is pressed.
 
-    Returns the global flip time at which the screen first appeared.
+    Returns the global flip time at which the screen first appeared. Pressing
+    ``escape`` raises :class:`gradcpt.errors.ExperimentInterrupted`.
     """
     from psychopy import visual
+
+    from ..errors import ExperimentInterrupted
 
     stim = visual.TextStim(win, text=text, color=(1, 1, 1), wrapWidth=1.5)
     stim.draw()
     onset = win.flip()
     kb.clearEvents()
+    polled = list(advance_keys) + ["escape"]
     while True:
-        keys = kb.getKeys(keyList=list(advance_keys), waitRelease=False, clear=True)
-        if keys:
+        keys = kb.getKeys(keyList=polled, waitRelease=False, clear=True)
+        for k in keys:
+            if k.name == "escape":
+                raise ExperimentInterrupted("escape pressed at instruction screen")
             return onset
         stim.draw()
         win.flip()
@@ -38,7 +44,7 @@ def welcome_screen(win, kb, dom_key: str, nondom_role: str = "no-go") -> float:
         "Welcome to GradCPT.\n\n"
         f"Press '{dom_key}' for CITY scenes (go).\n"
         f"Withhold your response for MOUNTAIN scenes ({nondom_role}).\n\n"
-        "Press SPACE to continue."
+        "Press SPACE to continue. Press ESC at any time to abort."
     )
     return show_text_then_wait(win, kb, msg)
 
@@ -47,7 +53,7 @@ def block_start_screen(win, kb, dom_key: str, block_idx: int) -> float:
     msg = (
         f"Block {block_idx + 1}\n\n"
         f"Press '{dom_key}' for CITY scenes; withhold for MOUNTAIN.\n\n"
-        "Press SPACE when ready."
+        "Press SPACE when ready (ESC to abort)."
     )
     return show_text_then_wait(win, kb, msg)
 

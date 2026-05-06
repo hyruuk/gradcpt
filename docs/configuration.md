@@ -50,6 +50,7 @@ any violation raises `ConfigError` with the offending field's name.
 | `stimuli.apply_circular_mask` | bool | true | Mask off corners outside an inscribed circle. |
 | `stimuli.flip_vertical` | bool | true | Preserves the original gradcptpy quirk. Set to false in fresh studies. |
 | `stimuli.normalize_to_minus1_plus1` | bool | true | Scale uint8 → float32 in [-1, +1]. |
+| `stimuli.display_size` | float ∈ (0, 2] | 0.5 | Drawn size in PsychoPy *height* units (1.0 = full screen height in both axes). The default 0.5 paints a square half the screen height tall — the circular mask makes it appear as a perfect circle regardless of screen aspect ratio. |
 | `window.fullscreen` | bool | true | Fullscreen mode. |
 | `window.size` | [int, int] | [1920, 1080] | Window pixel size (used as fullscreen target). |
 | `window.monitor_name` | str | "testMonitor" | PsychoPy monitor name. |

@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import logging
 import random as _random
+import signal
 from typing import TYPE_CHECKING, Optional
 
 from . import __version__ as PACKAGE_VERSION
 from .bids import BIDSWriter, EventRow
 from .codebook import EventCode
 from .config import Config
+from .errors import ExperimentInterrupted
 from .probes import ProbeScheduler, load_probe_items
 from .reconcile import reconcile
 from .responses import KeyPressLog
@@ -77,6 +79,15 @@ def run_experiment(
     from psychopy import core, event, visual
     from psychopy.hardware import keyboard
 
+    # Restore Python's default SIGINT handler so Ctrl+C from the terminal
+    # raises KeyboardInterrupt promptly. PsychoPy / pyglet sometimes
+    # install their own handler that swallows it.
+    try:
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+    except ValueError:
+        # Not on the main thread — leave the handler alone.
+        pass
+
     if sender is None:
         sender = make_sender(cfg.triggers)
     if win is None:
@@ -115,12 +126,16 @@ def run_experiment(
         meas.measured_hz, cfg.task.expected_refresh_rate_hz, transition_steps,
     )
 
-    # ImageStim — single instance reused for all trials
+    # ImageStim — single instance reused for all trials.
+    # `units="height"` makes the size square regardless of screen aspect
+    # ratio (1.0 = full screen height in *both* axes). Without this, a
+    # `units="norm"` size of (0.5, 0.5) on a 16:9 screen renders as a
+    # horizontal ellipse.
     image_stim = visual.ImageStim(
         win=win,
-        size=(0.5, 0.5),
+        size=(cfg.stimuli.display_size, cfg.stimuli.display_size),
         pos=(0, 0),
-        units="norm",
+        units="height",
     )
 
     # Probes
@@ -140,7 +155,93 @@ def run_experiment(
     from .routines.probe_loop import run_probe
     from .routines.trial_loop import run_trial_loop
 
-    welcome_screen(win, kb, dom_key=dom_key)
+    interrupted = False
+    try:
+        welcome_screen(win, kb, dom_key=dom_key)
+        _run_blocks_inner(
+            cfg=cfg,
+            win=win,
+            kb=kb,
+            mouse=mouse,
+            sender=sender,
+            writer=writer,
+            rng=rng,
+            dom_key=dom_key,
+            nondom_key=nondom_key,
+            transition_steps=transition_steps,
+            refresh_threshold_s=refresh_threshold_s,
+            image_stim=image_stim,
+            image_array_by_id=image_array_by_id,
+            dom_ids=dom_ids,
+            nondom_ids=nondom_ids,
+            probe_items=probe_items,
+            meas=meas,
+        )
+    except (ExperimentInterrupted, KeyboardInterrupt) as e:
+        log.warning("Experiment interrupted: %s", e or "(no message)")
+        interrupted = True
+    finally:
+        try:
+            sender.send(EventCode.EXPERIMENT_END)
+        except Exception:
+            pass
+        try:
+            sender.close()
+        except Exception:
+            pass
+        # If we were interrupted mid-block, flush whatever we have.
+        try:
+            if writer._current_run_idx is not None:
+                writer.set_block_metadata(dom_key=dom_key, seed=cfg.task.seed)
+                writer.end_block()
+        except Exception as e:
+            log.warning("Could not flush partial block: %s", e)
+        try:
+            writer.finalize()
+        except Exception as e:
+            log.warning("Could not finalize BIDS dataset: %s", e)
+        if not interrupted:
+            try:
+                writer.sanity_check()
+            except Exception as e:
+                log.warning("BIDS sanity check failed: %s", e)
+            try:
+                debrief_screen(win, kb)
+            except Exception:
+                pass
+        try:
+            win.close()
+        except Exception:
+            pass
+
+
+def _run_blocks_inner(
+    *,
+    cfg: Config,
+    win,
+    kb,
+    mouse,
+    sender,
+    writer: BIDSWriter,
+    rng: _random.Random,
+    dom_key: str,
+    nondom_key: str,
+    transition_steps: int,
+    refresh_threshold_s: float,
+    image_stim,
+    image_array_by_id: dict,
+    dom_ids: list[str],
+    nondom_ids: list[str],
+    probe_items,
+    meas,
+) -> None:
+    """Inner loop over blocks. Split out so the runner can wrap it in a
+    single try/finally for graceful interruption handling."""
+    from psychopy import core
+
+    from .routines.instructions import block_rest_screen, block_start_screen, countdown_screen
+    from .routines.probe_loop import run_probe
+    from .routines.trial_loop import run_trial_loop
 
     for block_idx in range(cfg.task.n_blocks):
         run_idx = writer.begin_block(block_idx)
@@ -282,10 +383,3 @@ def run_experiment(
         )
         writer.end_block()
         block_rest_screen(win, kb, block_idx=block_idx)
-
-    sender.send(EventCode.EXPERIMENT_END)
-    sender.close()
-    debrief_screen(win, kb)
-    writer.finalize()
-    writer.sanity_check()
-    win.close()
