@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gradcpt"
+version = "0.1.0"
+description = "A robust PsychoPy implementation of the gradual-onset continuous performance task with BIDS output and pluggable hardware triggers."
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+license = { text = "MIT" }
+authors = [{ name = "GradCPT contributors" }]
+keywords = ["psychophysics", "psychology", "psychopy", "gradcpt", "BIDS", "EEG"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.24,<3",
+    "pandas>=2.0,<3",
+    "pyyaml>=6.0",
+    "Pillow>=10",
+]
+
+# PsychoPy is an optional install — the package is importable, testable,
+# and the post-hoc reconciliation runs without it. Install [run] to actually
+# present the task on a screen.
+[project.optional-dependencies]
+run = ["psychopy>=2024.2,<2025"]
+serial = ["pyserial>=3.5"]
+lsl = ["pylsl>=1.16"]
+parallel = []
+all-triggers = ["gradcpt[serial,lsl]"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=4",
+    "pytest-mock>=3.12",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+gradcpt = "gradcpt.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gradcpt"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/gradcpt/data" = "gradcpt/data"
+"src/gradcpt/stimuli_assets" = "gradcpt/stimuli_assets"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "tests/",
+    "docs/",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+markers = ["gui: tests that open a PsychoPy window (require display)"]
+addopts = "-m 'not gui' --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["psychopy.*", "pylsl", "serial", "PIL.*", "yaml"]
+ignore_missing_imports = true
