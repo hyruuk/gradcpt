@@ -19,9 +19,9 @@ any violation raises `ConfigError` with the offending field's name.
 | `task.n_blocks` | int ≥ 1 | 2 | Number of blocks per execution. |
 | `task.transition_time_s` | float > 0 | 0.8 | Seconds for a stimulus to fade into the next. |
 | `task.prop_dom` | float ∈ (0, 1) | 0.9 | Proportion of dominant (city) trials. |
-| `task.expected_refresh_rate_hz` | float > 0 | 60.0 | Sanity-check target. Compared to measured rate. |
-| `task.refresh_rate_tolerance_hz` | float | 2.0 | Warn if `|measured - expected| > this`. |
-| `task.refresh_rate_abort_tolerance_hz` | float | 5.0 | Abort if `|measured - expected| > this`. |
+| `task.expected_refresh_rate_hz` | float \| null | null | Optional sanity-check target. null → trust the measured rate; set e.g. 60 / 120 to validate the active monitor. |
+| `task.refresh_rate_tolerance_hz` | float | 2.0 | Warn if `|measured - expected| > this`. (Ignored when `expected_refresh_rate_hz` is null.) |
+| `task.refresh_rate_abort_tolerance_hz` | float | 5.0 | Abort if `|measured - expected| > this`. (Ignored when `expected_refresh_rate_hz` is null.) |
 | `task.dom_key` | "auto" \| "j" \| "f" | "auto" | "auto" picks one randomly per session. |
 | `task.log_extra_keys` | bool | true | Log non-dom-key presses in `_beh.tsv`. |
 | `task.seed` | int \| null | null | Determinism. Recorded in `_beh.json`. |

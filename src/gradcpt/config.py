@@ -34,7 +34,10 @@ class TaskConfig:
     n_blocks: int = 2
     transition_time_s: float = 0.8
     prop_dom: float = 0.9
-    expected_refresh_rate_hz: float = 60.0
+    # If None, the measured refresh rate is logged and used as-is; no
+    # cross-check is performed. Set to e.g. 60.0 (or 120.0 for a 120 Hz
+    # monitor) to catch the "ran on the wrong screen" failure mode.
+    expected_refresh_rate_hz: float | None = None
     refresh_rate_tolerance_hz: float = 2.0
     refresh_rate_abort_tolerance_hz: float = 5.0
     dom_key: Literal["j", "f", "auto"] = "auto"
@@ -120,8 +123,8 @@ class Config:
             raise ConfigError("task.prop_dom must be in (0, 1)")
         if t.transition_time_s <= 0:
             raise ConfigError("task.transition_time_s must be > 0")
-        if t.expected_refresh_rate_hz <= 0:
-            raise ConfigError("task.expected_refresh_rate_hz must be > 0")
+        if t.expected_refresh_rate_hz is not None and t.expected_refresh_rate_hz <= 0:
+            raise ConfigError("task.expected_refresh_rate_hz must be > 0 when set")
         if not (0.0 <= t.unambig_low < t.unambig_high <= 1.0):
             raise ConfigError("require 0 <= task.unambig_low < task.unambig_high <= 1")
 

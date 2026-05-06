@@ -25,8 +25,8 @@ class TimingError(RuntimeError):
 @dataclass(frozen=True)
 class RefreshRateMeasurement:
     measured_hz: float
-    expected_hz: float
-    deviation_hz: float
+    expected_hz: float | None
+    deviation_hz: float | None
     n_warmup_frames: int
     n_frames_used: int
 
@@ -51,8 +51,13 @@ def check_refresh_rate(
 ) -> None:
     """Warn or abort based on tolerance bands.
 
-    The same band logic is applied for both directions of deviation.
+    If ``meas.expected_hz`` is ``None`` (no expected value declared) the
+    check is skipped — we trust the measured rate. The same band logic is
+    applied for both directions of deviation when expected is set.
     """
+    if meas.expected_hz is None:
+        log.info("Measured refresh rate %.2f Hz (no expected value to compare).", meas.measured_hz)
+        return
     dev = abs(meas.measured_hz - meas.expected_hz)
     if dev > abort_tolerance_hz:
         raise TimingError(
@@ -72,7 +77,7 @@ def check_refresh_rate(
 
 def measure_refresh_rate(
     win,
-    expected_hz: float,
+    expected_hz: float | None,
     *,
     n_identical: int = 10,
     n_max_frames: int = 100,
@@ -96,11 +101,11 @@ def measure_refresh_rate(
     if measured is None:
         measured = _fallback_median_rate(win, n_warmup=n_warmup, n_frames=30)
         n_used = 30
-    dev = abs(measured - expected_hz)
+    dev = None if expected_hz is None else abs(measured - expected_hz)
     return RefreshRateMeasurement(
         measured_hz=float(measured),
-        expected_hz=float(expected_hz),
-        deviation_hz=float(dev),
+        expected_hz=float(expected_hz) if expected_hz is not None else None,
+        deviation_hz=float(dev) if dev is not None else None,
         n_warmup_frames=n_warmup,
         n_frames_used=n_used,
     )

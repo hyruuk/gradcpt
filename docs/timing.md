@@ -17,14 +17,17 @@ within 1 ms of each other before returning. If that fails (rare, but possible
 with a misconfigured monitor), we fall back to the median of 30 flip
 intervals.
 
-The measured rate is then compared to `task.expected_refresh_rate_hz`:
+The measured rate is logged. If `task.expected_refresh_rate_hz` is set
+(default: null), the measured rate is also compared to it:
 
 * Within `refresh_rate_tolerance_hz` (default 2 Hz) → silent.
 * Above tolerance, below `refresh_rate_abort_tolerance_hz` (default 5 Hz) → log a warning.
 * Above abort tolerance → raise `TimingError` and halt the experiment.
 
-The default bands accept 58–62 Hz silently and abort outside 55–65 Hz —
-catches the "ran on a 144 Hz monitor by accident" failure mode.
+When `expected_refresh_rate_hz` is null (the default), the cross-check is
+skipped — we trust whatever the monitor reports. Set it to your declared
+target (e.g. `60` or `120`) to catch the "ran on the wrong screen" failure
+mode.
 
 ## 2. Frame-counted trial loop
 

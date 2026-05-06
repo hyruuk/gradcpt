@@ -36,14 +36,23 @@ def test_compute_transition_steps_invalid():
         compute_transition_steps(60.0, 0)
 
 
-def _meas(measured_hz: float, expected_hz: float = 60.0) -> RefreshRateMeasurement:
+def _meas(measured_hz: float, expected_hz: float | None = 60.0) -> RefreshRateMeasurement:
     return RefreshRateMeasurement(
         measured_hz=measured_hz,
         expected_hz=expected_hz,
-        deviation_hz=abs(measured_hz - expected_hz),
+        deviation_hz=None if expected_hz is None else abs(measured_hz - expected_hz),
         n_warmup_frames=10,
         n_frames_used=100,
     )
+
+
+def test_check_refresh_rate_skipped_when_expected_is_none(caplog):
+    import logging
+    with caplog.at_level(logging.INFO, logger="gradcpt.timing"):
+        check_refresh_rate(_meas(119.83, expected_hz=None), tolerance_hz=2.0, abort_tolerance_hz=5.0)
+    # Should not raise and should not warn — only an info log.
+    assert "Measured refresh rate" in caplog.text
+    assert "Aborting" not in caplog.text
 
 
 def test_check_refresh_rate_within_tolerance_silent(caplog):

@@ -44,6 +44,7 @@ def test_dataclass_defaults_match_documented_values():
     assert (t.n_trials, t.n_blocks, t.transition_time_s, t.prop_dom) == (80, 2, 0.8, 0.9)
     assert t.dom_key == "auto"
     assert t.unambig_low == 0.4 and t.unambig_high == 0.55
+    assert t.expected_refresh_rate_hz is None
 
     p = ProbeConfig()
     assert (p.enabled, p.next_es_min, p.next_es_max, p.isi_s) == (True, 30, 45, 0.5)
