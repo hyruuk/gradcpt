@@ -23,18 +23,19 @@ uv pip install -e ".[dev]"
 uv run pytest
 ```
 
-To actually run the experiment you also need PsychoPy. PsychoPy lives in a
-PEP 735 dependency group (not in `[project.optional-dependencies]`) because
-its 2024.2.x releases pull in an unpublished `pypi-search` transitive that
-breaks lockfile resolution. Install with:
+To actually run the experiment you also need PsychoPy. PsychoPy 2024.2.x
+declares a broken transitive (`pypi-search`, not on PyPI) and on Linux its
+`wxPython` dep only ships as source — install both with the bundled script:
 
 ```bash
-uv pip install --group run -e .
+./scripts/install_psychopy.sh
 uv run gradcpt run --subject pilot01 --bids-root ./bids
 ```
 
-On Linux PsychoPy can still be finicky — see [docs/quickstart.md](docs/quickstart.md)
-for fallbacks (Standalone PsychoPy, `--no-deps`, etc.).
+The script installs the prebuilt wxPython wheel for your distro from
+extras.wxpython.org, then PsychoPy with `--no-deps`, then the rest of
+PsychoPy's declared deps individually. See
+[docs/quickstart.md](docs/quickstart.md) for what it does and why.
 
 Optional hardware-trigger backends:
 

@@ -41,28 +41,21 @@ dev = [
     "mypy>=1.10",
 ]
 
-# PEP 735 dependency groups. PsychoPy lives here (not in
-# `optional-dependencies`) because PsychoPy 2024.2.x's transitive deps
-# (notably `pypi-search`) are not always satisfiable on PyPI, and a
-# universal lockfile that includes them aborts every `uv run` even when the
-# user only needs base / dev deps. Groups are opt-in: install with
-# `uv pip install -e . --group run` or `uv sync --group run`.
-[dependency-groups]
-run = ["psychopy>=2024.2,<2025"]
+# PsychoPy is intentionally NOT declared as a project dependency.
+#
+# PsychoPy 2024.2.x has a broken transitive (`pypi-search>=1.2.1`, never
+# published to PyPI) and on Linux requires a prebuilt wxPython wheel from
+# extras.wxpython.org (the PyPI sdist of wxPython doesn't build without
+# system GTK/OpenGL dev headers). `uv` cannot resolve either of these
+# automatically. Use `scripts/install_psychopy.sh` to set them up:
+#
+#     uv pip install -e ".[dev]"
+#     ./scripts/install_psychopy.sh
+#
+# See docs/quickstart.md for details.
 
 [project.scripts]
 gradcpt = "gradcpt.cli:main"
-
-[tool.uv]
-# PsychoPy 2024.2.x transitively depends on `pypi-search`, which is not
-# published to PyPI under that name — every version of PsychoPy in our
-# range fails resolution by default. Override the dep with a never-matching
-# marker so uv's universal lockfile skips it. Users who actually rely on
-# PsychoPy's `pypi_search` import (an internal helper for browsing PyPI from
-# the IDE) won't need it for running experiments.
-override-dependencies = [
-    "pypi-search; python_version < '0'",
-]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gradcpt"]
