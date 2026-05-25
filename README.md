@@ -1,13 +1,9 @@
-# gradcpt
+# Gradual Continuous Performance Task
 
 A robust PsychoPy implementation of the gradual-onset continuous performance
 task (GradCPT; Esterman et al. 2013). Optional thought probes, pluggable
 hardware triggers (serial / parallel / LSL / none), online + offline
 response-to-trial mapping, and BIDS-formatted output.
-
-This package is a clean-room replacement of
-[`gradcptpy`](https://github.com/DynamicBrainMind/gradcptpy). The original is
-preserved as a sibling directory and is not modified.
 
 ## About the task
 
