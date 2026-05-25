@@ -19,6 +19,10 @@ from typing import Any, Literal, get_args, get_origin, get_type_hints
 import yaml
 
 
+# Default location of the persistent user-editable config (CWD-relative).
+DEFAULT_USER_CONFIG_PATH = Path("config.yaml")
+
+
 class ConfigError(ValueError):
     """Raised when the configuration is malformed or contradictory."""
 
@@ -301,6 +305,24 @@ def to_plain_dict(cfg: Any) -> dict[str, Any]:
     if isinstance(cfg, dict):
         return {k: to_plain_dict(v) for k, v in cfg.items()}
     return cfg
+
+
+def save_user_config(cfg: Config, path: Path) -> None:
+    """Write the resolved config to ``path`` as YAML.
+
+    Per-session fields (``bids.subject``, ``bids.session``, ``bids.run_index``,
+    ``task.seed``) are stripped so the file is reusable across sessions.
+    """
+    data = to_plain_dict(cfg)
+    bids = data.get("bids", {})
+    bids["subject"] = ""
+    bids["session"] = None
+    bids["run_index"] = None
+    task = data.get("task", {})
+    task["seed"] = None
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 
 def load_config(

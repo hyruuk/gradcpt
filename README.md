@@ -100,6 +100,9 @@ uv pip install -e ".[all-triggers]"  # both
 ## CLI
 
 ```
+gradcpt [--config PATH] [--subject ID] [--session ID]
+        [--triggers {none,serial,parallel,lsl}] [--bids-root PATH]
+        [--seed N] [--no-gui]
 gradcpt run [--config PATH] [--subject ID] [--session ID] [--no-probes]
             [--triggers {none,serial,parallel,lsl}] [--bids-root PATH]
             [--seed N] [--no-gui] [--probes-file PATH]
@@ -108,6 +111,22 @@ gradcpt list-stimuli [--folder PATH]
 ```
 
 Also runnable as `python -m gradcpt`.
+
+### Bare `gradcpt` (quick mode)
+
+`gradcpt` with no subcommand uses a persistent `./config.yaml` so you only get
+prompted for what changes session-to-session:
+
+- **No `config.yaml` yet** — the full GUI opens, seeded from bundled defaults
+  (probes off). On confirm, `./config.yaml` is written with everything except
+  per-session fields (subject, session, seed, run_index).
+- **`config.yaml` exists** — only a minimal GUI prompts for subject and
+  session; all other parameters come from the file as-is.
+- **`--config foo.yaml`** — load that file, open the full GUI to review/edit,
+  and save back to `foo.yaml` after confirm.
+
+To enable probes, set `probe.enabled: true` in your `config.yaml` (or use the
+full `gradcpt run` subcommand, which keeps the historical probes-on default).
 
 ## Output
 

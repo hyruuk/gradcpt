@@ -11,6 +11,25 @@
 The merged dict is then cast to a frozen `Config` dataclass and validated;
 any violation raises `ConfigError` with the offending field's name.
 
+## Persistent `./config.yaml` (bare-mode flow)
+
+Bare `gradcpt` (no subcommand) treats `./config.yaml` in the current
+directory as a persistent, user-editable settings file:
+
+| State | Behaviour |
+|---|---|
+| `./config.yaml` missing, no `--config` | Full GUI opens seeded from bundled defaults (with `probe.enabled` forced to `false`). On confirm, `./config.yaml` is written. |
+| `./config.yaml` present, no `--config` | File loaded as-is. Minimal GUI prompts only for `bids.subject` and `bids.session`. |
+| `--config foo.yaml` | `foo.yaml` loaded. Full GUI opens for review/edit. On confirm, `foo.yaml` is rewritten with the new values. |
+
+In all three cases the saved YAML strips per-session fields (`bids.subject`,
+`bids.session`, `bids.run_index`, `task.seed`) so the file is reusable across
+participants.
+
+`gradcpt run` is unaffected by this — it never reads or writes `./config.yaml`
+and keeps the historical default of `probe.enabled: true` unless `--no-probes`
+or a `--config` says otherwise.
+
 ## Schema
 
 | Path | Type | Default | Meaning |
