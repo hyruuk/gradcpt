@@ -1,13 +1,47 @@
 # gradcpt
 
-A robust PsychoPy implementation of the gradual-onset continuous performance task
-(GradCPT; Esterman et al. 2013). Optional thought probes, pluggable triggers
-(serial / parallel / LSL / none), online + offline response-to-trial mapping,
-and BIDS-formatted output.
+A robust PsychoPy implementation of the gradual-onset continuous performance
+task (GradCPT; Esterman et al. 2013). Optional thought probes, pluggable
+hardware triggers (serial / parallel / LSL / none), online + offline
+response-to-trial mapping, and BIDS-formatted output.
 
 This package is a clean-room replacement of
 [`gradcptpy`](https://github.com/DynamicBrainMind/gradcptpy). The original is
 preserved as a sibling directory and is not modified.
+
+## About the task
+
+GradCPT is a sustained-attention task in which scenes morph continuously into
+one another. Participants respond to **frequent** (dominant) stimuli and
+withhold on **rare** stimuli. Because each stimulus fades in over
+`transition_time_s` rather than appearing abruptly, the task minimizes
+low-level visual transients and yields a continuous, trial-by-trial readout of
+attentional state suitable for downstream analyses like the Variance Time
+Course (VTC).
+
+![Figure 1. Gradual-onset Continuous Performance Task (gradCPT)](docs/images/gradCPT.png)
+
+**Figure 1. Gradual-onset Continuous Performance Task (gradCPT).**
+**A.** Four consecutive trials illustrating the four event types this package
+scores online and writes to `events.tsv`:
+
+| Stimulus | Response | Event type |
+|---|---|---|
+| Frequent (dominant, ~90%) | press | **baseline / correct go** |
+| Rare (target, ~10%) | no press | **correct omission** |
+| Frequent | no press | **omission error** |
+| Rare | press | **commission error (lapse)** |
+
+The green/red bars show stimulus coherence rising from 0% → 100% → 0% over
+~850 ms. The hand icons mark a keypress and the arrows indicate which trial
+the press is assigned to (see [docs/algorithm.md](docs/algorithm.md) for the
+unambiguous-zone heuristic).
+
+**B.** Typical session structure used in published gradCPT studies (e.g.
+Esterman 2013, Saflow): an eyes-open rest block, six task blocks, a closing
+rest block. This package implements the task blocks — block count, trials per
+block, and dominant-stimulus proportion are all configurable
+(`task.n_blocks`, `task.n_trials`, `task.prop_dom`).
 
 ## Quickstart
 
@@ -45,6 +79,24 @@ uv pip install -e ".[serial]"        # add serial-port triggers
 uv pip install -e ".[all-triggers]"  # both
 ```
 
+## What this package gives you
+
+- **Frame-accurate stimulus timing**: vsync-driven trial loop with refresh
+  measurement, dropped-frame logging, and optional refresh-rate guardrails
+  (see [docs/timing.md](docs/timing.md)).
+- **Online response scoring**: each keypress is assigned to a trial in
+  real time using the dominant-stimulus coherence at press time; ambiguous
+  presses falling in the transition zone are routed by the rules in
+  [docs/algorithm.md](docs/algorithm.md), with an offline reconciler that
+  reproduces and verifies the assignment.
+- **Optional thought probes**: experience-sampling items interspersed at
+  configurable intervals; fully suppressible with `--no-probes`.
+- **Pluggable triggers**: `none`, `serial`, `parallel`, or LSL markers,
+  sharing a single event codebook ([docs/triggers.md](docs/triggers.md)).
+- **BIDS-Behavioral output**: ready to drop into a BIDS dataset, including a
+  full config snapshot, refresh-rate measurement, and dropped-frame summary
+  per run.
+
 ## CLI
 
 ```
@@ -77,7 +129,13 @@ Data is written in BIDS-Behavioral layout under `--bids-root`:
 One block of trials = one BIDS run. `events.tsv` is the analysis-ready table
 (trial onsets, responses, accuracy, probe responses); `_beh.tsv` is the raw
 keypress log; `_beh.json` carries refresh-rate measurement, dropped-frame
-summary, full config snapshot.
+summary, and a full config snapshot.
+
+Downstream pipelines (e.g.
+[saflow](https://github.com/cocolab/saflow) for MEG) consume `events.tsv`
+directly: trial onsets, RTs, and the four event types above are the inputs
+needed to compute the Variance Time Course and split trials into attentional
+zones.
 
 ## Documentation
 
@@ -92,4 +150,6 @@ summary, full config snapshot.
 ## License
 
 MIT — see [LICENSE](LICENSE). Stimulus images are derived from the original
-`gradcptpy` distribution (also MIT, 2024 David Braun).
+`gradcptpy` distribution (also MIT, 2024 David Braun). The gradCPT figure
+above is reproduced from the [saflow](https://github.com/cocolab/saflow)
+project.
