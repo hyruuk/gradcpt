@@ -1,0 +1,64 @@
+# gradcpt default configuration.
+# Mirrors the dataclass defaults in src/gradcpt/config.py.
+# Tested by test_config::test_default_yaml_matches_dataclass — keep in sync.
+
+task:
+  n_trials: 80
+  n_blocks: 2
+  transition_time_s: 0.8
+  prop_dom: 0.9
+  expected_refresh_rate_hz: null  # null = trust the measured rate; set e.g. 60 or 120 to validate
+  refresh_rate_tolerance_hz: 2.0
+  refresh_rate_abort_tolerance_hz: 5.0
+  dom_key: auto              # one of: auto, j, f
+  log_extra_keys: true
+  seed: null
+  unambig_low: 0.4
+  unambig_high: 0.55
+  benefit_of_doubt_for_nogo: true
+
+probe:
+  enabled: true
+  next_es_min: 30
+  next_es_max: 45
+  isi_s: 0.5
+  submit_key: return
+  items_file: null           # null → use bundled default_probes.yaml
+  initial_mouse_jitter: 0.05
+  initial_mouse_y: -0.4
+
+triggers:
+  backend: none              # one of: none, serial, parallel, lsl
+  serial_port: null
+  serial_baud: 115200
+  parallel_address: null
+  lsl_stream_name: gradcpt-events
+  lsl_stream_type: Markers
+  pulse_duration_s: 0.005
+
+stimuli:
+  folder: null               # null → bundled stimuli_assets/
+  scrambled_enabled: false
+  scrambled_role: distractor # one of: distractor, extra_nogo, extra_go
+  image_size_px: 256
+  apply_circular_mask: true
+  flip_vertical: true        # preserves original gradcptpy quirk
+  normalize_to_minus1_plus1: true
+  display_size: 0.5          # height units; 0.5 = half screen height (square, circular after mask)
+
+window:
+  fullscreen: true
+  size: [1920, 1080]
+  monitor_name: testMonitor
+  color: [0.0, 0.0, 0.0]
+  units: norm
+  screen: 0
+  record_frame_intervals: true
+
+bids:
+  root: bids
+  subject: ""                # required at runtime — set via CLI/GUI
+  session: null
+  task_label: gradcpt
+  run_index: null            # null → auto-increment per block
+  write_validator_report: false

@@ -1,0 +1,41 @@
+# Default experience-sampling items.
+# Mirrors gradcptpy.py:543–573. The "confidence" item has fixed_position: true
+# so it always appears last; all other items are presented in shuffled order
+# within a probe.
+
+items:
+  - name: distractedness
+    text: "Where was your attention during the previous trial?"
+    low_anchor: "on-task"
+    high_anchor: "off-task"
+    fixed_position: false
+
+  - name: affect
+    text: "How positive or negative were you feeling?"
+    low_anchor: "completely\nnegative"
+    high_anchor: "completely\npositive"
+    fixed_position: false
+
+  - name: disengage_difficulty
+    text: "How difficult was it to disengage from your thoughts?"
+    low_anchor: "extremely\neasy"
+    high_anchor: "extremely\ndifficult"
+    fixed_position: false
+
+  - name: movement
+    text: "Were your thoughts freely moving?"
+    low_anchor: "unmoving"
+    high_anchor: "moving freely"
+    fixed_position: false
+
+  - name: deliberate
+    text: "How intentional were your thoughts?"
+    low_anchor: "completely\nunintentional"
+    high_anchor: "completely\nintentional"
+    fixed_position: false
+
+  - name: confidence
+    text: "How confident are you about your ratings for this trial?"
+    low_anchor: "completely\nunconfident"
+    high_anchor: "completely\nconfident"
+    fixed_position: true

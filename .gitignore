@@ -32,7 +32,7 @@ uv.lock
 .DS_Store
 
 # PsychoPy artifacts left by ad-hoc runs
-data/
+/data/
 *.psydat
 *.log
 lastRun.log
